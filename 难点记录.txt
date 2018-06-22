@@ -1,0 +1,304 @@
+头部部分有几个问题进行记录：
+（1）wbepack.base.conf.js文件下
+resolve: {
+  alias: {
+    'common':resolve('src/common'),   //配置文件路径在编译之后不需要使用相对路径来寻址
+    'components':resolve('src/components')
+  }
+}
+1、问题已经解决：
+  比如在m-header组件中引入haha.vue组件，并且通过这种配置方式已经成功引入了，没有报错。
+2、这种配置方式的作用是：设置别名是为了让后续引用的地方减少路径的复杂度。
+3、另外我们看到的这种书写方式：@import "~common/stylus/variable"
+这里的'~'是stylus-loader里面的一个东西，另外common是我们在resolve.alias设置的。
+
+
+
+（2）第二个是stylus的配置问题：
+先npm install stylus stylus-loader --save.
+然后在组件中的style中引入<style scoped lang="stylus" rel="stylesheet/stylus">
+这三个步骤一个都不能少。
+
+还有一个对应的问题就是sass的安装：
+一共有三个步骤：
+a）安装sass的安装包：
+  > * npm install --save-dev sass-loader
+  > * 同时sass-loader依赖于node-sass,所以执行以下语句：npm install --save-dev node-sass
+b）在build文件夹下的webpack.base.conf.js的rules里面添加以下配置：可以放到 test:/\.js$/之后
+  `
+  {
+    test: /\.sass$/,
+    loaders: ['style', 'css', 'sass']
+  }
+  `
+
+c) 在.vue组件中的style标签内添加lang='scss'.
+
+（3）介绍几个依赖插件的使用：
+"dependencies": {
+  "babel-runtime": "^6.26.0",   // 对es6的一些语法进行转译
+  "fastclick": "^1.0.6",  // 解决在移动端click事件的300ms的延迟问题
+},
+"devDependencies": {
+  "babel-polyfill": "^6.26.0" // 对es6一些API的补丁进行修补
+}
+在main.js中这样引入：
+import 'babel-polyfill' // 解决es6的API补丁问题
+import fastclick from 'fastclick'
+fastclick.attach(document.body) // 将document上的所有节点都有fastclick的特性
+
+=====、/
+（4）在style中的@import中存在这样的一种写法是什么意思？
+@import "~common/stylus/variable" 这个问题在序号1中找到答案了，~是stylus的一种写法，这个是用来
+引出文件的，common的配置是在webpack.base.conf.js中进行配置的，在alias中可以设置。
+
+(5)better-scroll在引入的过程中几点问题：
+num1：版本问题，并不是版本越高越好，这里建议稳定版的^0.1.15版本
+num2:不滚动的高度问题，需要在mounted的nextTick函数中去调用BScroll的实例化对象，并且
+最后在轮播图的外层.slider-wrapper加上v-if=“recommends.length”(保证了容器里面是有图片的),如果是在轮播下没有图片，那么使用BScroll肯定是会
+报错的。
+通过better-scroll.vue中做成的Scroll.vue组件可以作为一个通用的组件，但是需要记住在scroll组件里面的最外层需要用
+一个空div把它进行包裹才能有效，否则不行。
+
+(6) 导航的轮播图中new BScroll(this.$refs.slider, {click:true}这里需要设置click的状态才能让
+轮播图中的a标签能有跳转的效果，不然的话点击是没有反应的。
+
+(7)当在使用jsonp调用QQ音乐的接口的时候如果返回500状态时,我们分析一下header请求头里面的内容：两个指标：
+一个是host,一个是referer.单纯的点击这个js的时候没有效果(解决跨域问题)
+在服务端进行设置，文件是：build/webpack.dev.conf.js.具体代码是：
+```
+var axios = require('axios')
+var apiRoutes = require('express').Router()
+devServer: {
+    before(app) {
+      apiRoutes.get('/getDiscList', function (req, res) {
+        var url = 'https://c.y.qq.com/splcloud/fcgi-bin/fcg_get_diss_by_tag.fcg'
+        axios.get(url, {
+          headers: {
+            referer: 'https://c.y.qq.com/',
+            host: 'c.y.qq.com'
+          },
+          params: req.query
+        }).then((response) => {
+          res.json(response.data)
+        }).catch((e) => {
+          console.log(e)
+        })
+      })
+      app.use('/api', apiRoutes)
+    },
+    clientLogLevel: 'warning',
+    ...
+  }
+
+(8)这里封装了一个底层的scroll组件。路径是：src/base/scroll/scroll.vue
+现在这个组件已经被迁移过去了，位置是在`桌面/music/test`
+
+(9)在推荐页面recommend.vue中的一个函数loadImage，解决一个问题：就是当list的数据先返回，轮播图片的数据
+后返回的时候，那么在list里面的scroll滑到最下面还有一个image的高度看不见，所以在这个函数中就设置当第一张图片
+onload的时候那么就refresh一下scroll组件，重新计算高度。
+这里有一个不明白的事情，就是在这里模拟了一下延时2s拿到轮播图的数据，执行_getRecommend函数。但是代码：
+this.$refs.scrollTag.refresh()
+this.imageFlag = true
+是对的
+但是：
+this.imageFlag = true
+this.$refs.scrollTag.refresh()
+  是错的。
+
+解析：这个loadImage是在v-for状态下执行的，所以他一共会执行5次，只有在五张图片完全加载成功之后才会执行refresh.
+这是后面添加的判断条件，然后在一个计时器后执行函数这样才是正确的。
+```
+
+(10)讲解vue-lazyload的使用方法：通过npm install vue-lazyload -D 下载之后，
+在main.js引入import VueLazyload from 'vue-lazyload'
+Vue.use(VueLazyload)
+然后在组件中使用方式是：
+<img v-lazy='item.picurl'>这样就生效了
+
+(11)出现的一个问题是在vuex中很弱智的事情上。就是所有的state组件，mutations组件都写好了之后，最后忘记在
+main.js中引入store了，所以最终导致程序出现错误。造成这个的原因是把时间放在了视频学习本身，却没有去想程序
+逻辑本身是否合理，还有逻辑的整体性。
+
+(12)
+// style.charAt(0)表示获取第一个字符串字母的值
+return vendor + style.charAt(0).toUpperCase() + style.substr(1)
+
+(13)我的个人网站：192.23.29.170:8080中二维码显示的问题在于，手机端不支持mouseenter和mouseout事件。
+
+---------------------------------
+歌手部分：
+
+(1)播放这个大组件作为一个很多地方要使用的部分，所以很自然的就用vuex来引用，在这里定义了这些变量
+playing: false  // 当前的播放状态
+fullScreen: false // 播放器展开或者收起
+playlist: []   // 播放列表
+sequenceList: []  // 列表某种播放模式下形成的数组，在config.js中可以设置
+mode: playMode.sequence  //playMode.sequence在配置文件中设置，设置模式的状态
+currentIndex: -1   // 当前播放的索引，默认设置为-1
+
+getters中多了一个currentSong，既为当前歌曲
+
+(2)为什么在music-list的@select="selectItem"这个函数中不需要携带参数,而派发的函数在song-list中却带了参数的值？
+分析问题：
+    music-list是父组件，song-list是子组件，
+    那么我们在父组件中写了这个函数，然后在子组件中调用了这个函数。所以我们在父组件的
+    模板部分向子组件传递这个函数的时候不需要带任何参数，因为定义函数在父组件的methods中定义，
+    而真实调用该函数是在子组件的methods中，所以传参数应该是在子组件中
+
+
+(3)transition动画实现：
+一般是在这里设置动画效果.name-enter-active,.name-leave-active{
+  transition: all 0.4s
+}
+一般在这里设置开始状态.name-enter,.name-leave-to{
+  transform: translate(0,-100px,0)
+}
+
+(4)为什么在vuex的时候currentIndex: -1而不是从0开始计算的。
+
+【重点:放到以后来解决】
+(5)在transition动画的时候存在于一些钩子，他们分别是：player.vue组件中
+enter(el,done)
+after-enter()
+leave(el,done)
+after-leave()
+分别在enter和leave事件上有两个参数:第一个是当前元素el，一个是回调函数done.
+
+(6)music-list组件中派发了一个函数selectItem,这个函数调用了action中的selectPlay方法，
+然后在song-list组件中执行了这个函数，而传入的参数index是通过v-for='songList'得到的，
+在这里的index>=0，所以这个时候就从-1变成了我们点击的那首歌的下标（大于0的值）
+但是：
+既然在这个时候会由新的循环中的下标代替-1，那从-1开始有什么意义呢？从0开始不是更能说得通吗
+
+(7)player.vue这个组件中遇到的问题是：首先是歌曲的url出现问题，然后导致歌曲播放不出来。在这种
+情况下audio的两个事件canplay和error不能够正常执行，所以在开始的时候我先把那部分的代码注销掉了，
+暂时性的让他执行下去。
+而canplay和error这两个事件是在歌曲加载完成之后通过一个标识位songReady来确定是否加载成功了，songReady
+的状态是true的时候执行ready函数。
+
+
+(8)better-scroll插件中存在一个对touch事件的监听，所以只需要引入了better-scroll插件，就可以使用touchstart,
+touchmove和touchend这些事件。这里可以在progress-bar看到对进度条的使用了这些事件。
+
+(9)创建一个数组的副本，而且不会影响原来的值：
+let _arr = list.slice()
+伪数组转换为真数组的函数是：_arr是伪数组，arr是真数组。
+var arr = Array.prototype.slice.apply(_arr)
+
+(10)在player.vue组件中，handleLyric函数给当前歌曲的歌词赋值的过程中，我们可以看到txt
+并不知道从哪里来的，这一句话比较疑惑：this.playingLyric = txt
+分析问题：
+    lyric-parser这个包是用来解析歌词用的，这里的new Lyric(lyricStr, handler)是包定义的一个
+    通用方法,并且这里的handler带的参数都是定好的。
+
+
+(11)player.vue组件中的报错现在还不明原因：
+this.$refs.lyricList.$el.style[transitionDuration] = 0
+学习的进度：第七章最后一节
+
+===============================
+排行组件的总结：
+（1）fastclick插件有问题:该插件在点击歌曲并且播放之后无法回到推荐和歌单列表。
+
+================================
+搜索组件的总结：
+（1）在search组件中一个search-box组件定义的setQuery函数，在外层可以这样使用。
+addQuery(query) {
+   this.$refs.searchBox.setQuery(query)
+ }
+在<search-box ref="searchBox"></search-box>
+这是父级对子级的函数调用，拿到子组件的标识直接调就可以。
+
+
+ (2)巧妙的一个设计就是在suggest.vue中监听了query的变化。当值一发生变化，那么就会发一个请求过去。
+ query(newQuery) {
+   this._search(newQuery)
+ }
+
+(3)混入 (mixins) 是一种分发 Vue 组件中可复用功能的非常灵活的方式。
+mixin.js中向外暴露一个常量：playlistMixin
+然后在组件中引入的时候，例如在search.vue组件是这样操作的。
+```
+import {playlistMixin} from '../../common/js/mixin'
+export default {
+  mixins: [playlistMixin],
+  methods: {
+    handlePlaylist(playlist) {
+      const bottom = playlist.length > 0 ? '60px' : ''
+            // 外层添加一个定位值
+            this.$refs.shortcutWrapper.style.bottom = bottom
+            // 给scroll组件进行刷新操作
+            this.$refs.shortcut.refresh()
+            this.$refs.searchResult.style.bottom = bottom
+            this.$refs.suggest.refresh()
+          },
+  }
+}
+```
+
+
+(4)playlist.vue里面的hide方法中存在一个冒泡的情况，那么处理方法是：在playlist的下一级
+加入一个@click.stop用来阻止冒泡。
+
+
+
+----------
+(3)scroll组件中有一个refresh方法，我们可以看到引用了scroll.vue的组件中大多都这样使用让滚动条进行了重新的刷新。
+例如在rank.vue中就这样使用：this.$refs.toplist.refresh(),这样就相当于直接刷新了ref='toplist'的scroll.vue
+的组件，这个refresh其实还是走的scroll.vue中的refresh方法。第一次知道可以这样使用。
+         -- 解决底部的mini播放器的问题。
+
+
+--------------------
+打包优化和版本升级的问题：
+1、vue版本升级的问题：
+将之前的vue2.2.6版本升级成vue2.3.1版本（最新版）的时候，注意将对应的vue-router和vuex版本也做一个
+更新，并且在devDependencies中的vue-template-compiler版本要跟vue的版本一致。
+
+2、对项目进行build和对app.js的优化能很大程度上降低首次加载的速度。
+（1）对路由组件的优化(异步加载组件)：index.js(使用Promise异步加载的方式优化)
+const Recommend = (resolve) => {
+  import('components/recommend/recommend').then((module) => {
+    resolve(module)
+  })
+}
+上面的代码相当于：import Recommend from 'components/recommend/recommend'
+
+3、<transition-group name="list">
+    <li :key="item.id" v-for=""></li>
+  </transition-group>
+transition-group使用的时候需要给该标签设定一个name，并且必须要内部循环的组件设定一个:key="".这个key
+值是独一无二的一个标识。
+那么css样式一般会这样写：
+.name-enter-active,.name-leave-active{一个transition动画（transition: all 0.1s）}
+.name-enter,.name-leave-to{初始状态的样式}
+
+4、playlist.vue中遇到一个问题：
+就是在<span class="like" @click.stop="toggleFavorite(item)">
+       <i :class="getFavoriteIcon(item)"></i>
+     </span>
+ 点击是否收藏(喜爱)的标签中，开始的时候就将@click.stop的函数也写在了i标签下。但是这导致了点击事件不执行的问题。
+ 然后现在将点击事件放在span标签上的之后，所有的逻辑都回归正常了。
+ 所以我猜测：
+  当一个标签上同时存在两个函数的时候，他们之间会相互冲突。
+  或者是i标签下不执行click事件呢？
+我再试了一次：这次是可以了，都放在i标签下可以实现点击事件
+
+
+5、难点：new Song(song)这个实例方法没有太明白。
+文件在~common/js/song/song.js在userCenter文件中引用了。
+
+6、userCenter.vue组件中的scroll.refresh的问题。函数handlePlaylist从始至终只会执行一次，
+所以在从我喜欢的到最近听的过程中，这里的class="list-scroll"是不会refresh的。所以就会造成最近听的
+页面有空白发生（滚动条滚动到最下面去了）
+因为这里存在'我喜欢的'和'最近听的'两个模块，所以比如在show的时候显示的是我喜欢的此时refresh高度是700px,
+但是'最近听的'模块之后两首歌，但是显示的都还是700px的高度，而不会自己再去找一个恰当的高度去refresh.
+---------------------
+需要重点掌握的是：
+（1）jsonp的实现原理
+
+
+
+使用到的库：
+(1)good-storage(本地存储)
