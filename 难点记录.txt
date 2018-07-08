@@ -1,8 +1,14 @@
 头部部分有几个问题进行记录：
 （0）关于$refs设置样式的几种方式：
+[情景1]
 this.$refs.hel.style.background = `pink`;
+[情景2]
 this.$refs.hel.style['transform'] = `rotate(30deg)`
-this.$refs.hel.style['webkitTransform'] = `rotate(30deg)`」
+this.$refs.hel.style['webkitTransform'] = `rotate(30deg)`
+[情景3]
+<Scroll ref="lyricList"></Scroll>
+this.$refs.lyricList.$el.style[transform] = `translate3d(${width}px, 0, 0)
+----------------------------------分割线------------------------------------------
 （1）wbepack.base.conf.js文件下
 resolve: {
   alias: {
