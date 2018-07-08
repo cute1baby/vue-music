@@ -8,6 +8,8 @@ this.$refs.hel.style['webkitTransform'] = `rotate(30deg)`
 [情景3(组件标签的特殊样式)]
 <Scroll ref="lyricList"></Scroll>
 this.$refs.lyricList.$el.style[transform] = `translate3d(${width}px, 0, 0)
+
+【bug】player.vue中的class="normal-player"中的变量fullScreen=fasle时不生效。
 ----------------------------------分割线------------------------------------------
 （1）wbepack.base.conf.js文件下
 resolve: {
