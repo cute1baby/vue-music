@@ -1,4 +1,8 @@
 头部部分有几个问题进行记录：
+（0）关于$refs设置样式的几种方式：
+this.$refs.hel.style.background = `pink`;
+this.$refs.hel.style['transform'] = `rotate(30deg)`
+this.$refs.hel.style['webkitTransform'] = `rotate(30deg)`」
 （1）wbepack.base.conf.js文件下
 resolve: {
   alias: {
